@@ -1,3 +1,3 @@
 [submodule "moge"]
 	path = moge
-	url = git@github.com:microsoft/MoGe.git
+	url = git@github.com:ColemanIan/IMoGe.git
