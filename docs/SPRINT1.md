@@ -2,16 +2,19 @@ Mission
 ---
 One sentence, using the template from class. Do not call it final — it is your best guess until your first test says otherwise.
 
-    Improve the regularization of MoGe
+    For people who are limited to a single image who are reconstructing a 3D scene, Improved Monocular Geometry (IMoGe) is a deep learning model and framework for doing so. Unlike methods such as photogrammetry or MoGe-3, IMoGe uses object instance detection methods to create object-scoped point clouds; this should provide better detail per object as features locally spaced in 2D space are not transformed across objects that are distant in 3D space. 
+
 Target user
 ---
 One specific person. If your product has several users, name the primary one and build for them first.
 
-
+    Novel-view synthesis, augmented reality / virtual reality, robotic manipulation
 
 User stories
 ---
 Your top 5, with acceptance criteria. Put them on your GitHub board as issues — the board is the plan; the document just explains it.
+
+
 
 Feasibility
 ---
@@ -20,6 +23,16 @@ Show me, don’t tell me.  “We will use dataset X” is a wish. Downloaded, lo
 Tooling
 ---
 Languages, frameworks, models, and why — one line each. Full setup: next slide.
+
+    Language: Python
+    Framework: PyTorch
+    Relevant models: 
+    - DinoV2 Vision Transformer
+    - 
+    Datasets:
+    -
+    Evaluation Criteria:
+    -
 
 Demo
 ---
