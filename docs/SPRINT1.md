@@ -2,7 +2,7 @@ Mission
 ---
 One sentence, using the template from class. Do not call it final — it is your best guess until your first test says otherwise.
 
-    For people who are limited to a single image who are reconstructing a 3D scene, Improved Monocular Geometry (IMoGe) is a deep learning model and framework for doing so. Unlike methods such as photogrammetry or MoGe-3, IMoGe uses object instance detection methods to create object-scoped point clouds; this should provide better detail per object as features locally spaced in 2D space are not transformed across objects that are distant in 3D space. 
+    For autonomous vehicles and similar devices which are tasked with safely navigating a real environment, Improved Monocular Geometry is a deep-learning architecture and framework that improves object recognition and 3D scene reconstruction from a single image. Unlike the inspired MoGe-3 architecture which uses a self-guided sparse refinement regularization method, IMoGe segments objects in 3D projected frustums  to improve object estimation and minimize the transformational errors of 2D features local in image space being potentially distant or unrelated in 3D space. 
 
 Target user
 ---
@@ -13,6 +13,11 @@ One specific person. If your product has several users, name the primary one and
 User stories
 ---
 Your top 5, with acceptance criteria. Put them on your GitHub board as issues — the board is the plan; the document just explains it.
+
+    Users:
+    - Data limited users, possibly only have one or a small set of photographs of a real 3D scene and wish to reconstruct the scene digitally.
+    - Autonomous vehicles, object-enhanced computer vision can implicitly prioritize certain categories like children, pedestrians, and animals; object-wise regularization can improve classification and estimation tasks through occluded vision
+
 
 
 
@@ -25,14 +30,30 @@ Tooling
 Languages, frameworks, models, and why — one line each. Full setup: next slide.
 
     Language: Python
+    
     Framework: PyTorch
+
     Relevant models: 
     - DinoV2 Vision Transformer
     - 
+
     Datasets:
-    -
+    - KITTI (Karlsruhe Institute of Technology and Toyota Technological Institute of Chicago)
+    - - Single Image Depth: https://www.cvlibs.net/datasets/kitti/eval_depth.php?benchmark=depth_prediction
+    
+    - - SUN RGB-D 3D Object Detection: https://rgbd.cs.princeton.edu/
+
+    
     Evaluation Criteria:
-    -
+    - SILog: Scale invariant logarithmic error
+    
+    - sqErrorRel: Relative squared error (percent)
+
+    - absErrorRel: Relative absolute error (percent)
+
+    - iRMSE: Root mean squared error of the inverse depth [1/km]
+
+
 
 Demo
 ---
@@ -62,7 +83,8 @@ TO DO AFTER SPRINT PLANNING
 - Make the question real.  “Can you help us?” has no answer. “For a lab-alert tool, would you weight recall over precision?” gets a reply. If you cannot write the specific question, you do not understand your project yet.
 - If you email them  (optional, encouraged): read their latest abstract first, keep it under 150 words, and ask for nothing that costs more than 15 minutes. Professors answer good questions. They delete vague ones.
 
-
+Dr. Lei Tian : 
+Dr. Wei-Lun Chao
 
 Writing
 ---
@@ -87,7 +109,12 @@ My Idea
 - Take advantage of known Field of View (FOV) charachteristics of a camera to project frustums over objects for classification (also input the original image)
 - use the object classifications and bounding boxes as a prior for object-wise regularization of the MoGe-3 SSR method
 - also use a better concatenation method in the Sparse 3D U-Net
-\#READ Frustum PointNets
 
 Extra: Use highly accurate 3D model synthetic textures of real objects, eg. a person with hundreds to thousands of hairs on their head, as an extreme example, and fine-tune the ViT to predict the pointmap and pointmap density (local energy), object masks, and object classifications -> use this as a better prior for object-wise regularization
 
+OLD
+---
+
+mission: 
+    
+    For people who are limited to a single image who are reconstructing a 3D scene, Improved Monocular Geometry (IMoGe) is a deep learning model and framework for doing so. Unlike methods such as photogrammetry or MoGe-3, IMoGe uses object instance detection methods to create object-scoped point clouds; this should provide better detail per object as features locally spaced in 2D space are not transformed across objects that are distant in 3D space. 
