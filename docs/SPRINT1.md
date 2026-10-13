@@ -2,7 +2,7 @@ Mission
 ---
 One sentence, using the template from class. Do not call it final — it is your best guess until your first test says otherwise.
 
-    For autonomous vehicles and similar devices which are tasked with safely navigating a real environment, Improved Monocular Geometry is a deep-learning architecture and framework that improves object recognition and 3D scene reconstruction from a single image. Unlike the inspired MoGe-3 architecture which uses a self-guided sparse refinement regularization method, IMoGe segments objects in 3D projected frustums  to improve object estimation and minimize the transformational errors of 2D features local in image space being potentially distant or unrelated in 3D space. 
+    For autonomous vehicles and similar devices which are tasked with safely navigating a real environment, Improved Monocular Geometry is a deep-learning architecture and framework that improves object recognition and 3D scene reconstruction from a single image. Unlike other architectures which attempt global scene reconstruction at once, IMoGe segments objects in 3D projected frustums  to improve object estimation and minimize the transformational errors of 2D features local in image space being potentially distant or unrelated in 3D space which I believe will improve global scene reconstruction. 
 
 Target user
 ---
