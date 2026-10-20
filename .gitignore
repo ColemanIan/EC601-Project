@@ -20,3 +20,6 @@
 
 docs/GITHUB.md
 docs/SPRINT_1_PRESENTATION.odp
+paths
+data/*
+ignore

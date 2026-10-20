@@ -1,3 +1,6 @@
 [submodule "moge"]
 	path = moge
 	url = git@github.com:ColemanIan/IMoGe.git
+[submodule "frustum-pointnets"]
+	path = frustum-pointnets
+	url = git@github.com:charlesq34/frustum-pointnets.git
