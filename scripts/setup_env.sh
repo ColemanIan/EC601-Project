@@ -1,15 +1,14 @@
 #!/bin/bash -l
-# Build or update the imoge environment. Run from the repository root.
-set -eo pipefail  # if bash fails, exit and return error code
-
+# Build or update the cage environment. Run from the repository root.
+set -eo pipefail                     # not -u: conda's activation scripts read unset variables
 module purge
 module load miniconda
-if conda env list | grep -q "^imoge "; then
-    mamba env update -n imoge -f environment.yml --prune
+if conda env list | grep -q "^cage "; then
+    conda env update -n cage -f environment.yml --prune
 else
-    mamba env create -f environment.yml
+    conda env create -f environment.yml
 fi
-conda activate imoge
+conda activate cage
 export PYTHONNOUSERSITE=1
 export PIP_CACHE_DIR=/projectnb/ece601/colemian/.cache/pip
 
