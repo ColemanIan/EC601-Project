@@ -1,7 +1,7 @@
 # Usage: source env/scc.sh     (interactive sessions and job scripts)
 module purge # clears any module loaded earlier in the session
 module load miniconda
-conda activate CAGE
+conda activate cage
 
 export PROJ=/projectnb/ece601/colemian
 export CAGE_DATA=$PROJ/data

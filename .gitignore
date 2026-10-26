@@ -21,6 +21,6 @@
 docs/GITHUB.md
 docs/SPRINT_1_PRESENTATION.odp
 paths
-data/*
+data
 ignore
 *.egg-info
