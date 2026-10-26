@@ -23,3 +23,4 @@ docs/SPRINT_1_PRESENTATION.odp
 paths
 data/*
 ignore
+*.egg-info
