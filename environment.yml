@@ -1,4 +1,4 @@
-name: imoge
+name: cage
 channels:
   - conda-forge
   - nodefaults
