@@ -4,3 +4,6 @@
 [submodule "frustum-pointnets"]
 	path = frustum-pointnets
 	url = git@github.com:charlesq34/frustum-pointnets.git
+[submodule "total3d"]
+	path = total3d
+	url = https://github.com/yinyunie/Total3DUnderstanding.git
