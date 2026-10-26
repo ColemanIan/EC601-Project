@@ -1,9 +1,11 @@
 [submodule "moge"]
 	path = moge
-	url = git@github.com:ColemanIan/IMoGe.git
+	# url = git@github.com:ColemanIan/moge.git
+	url = https://github.com/microsoft/MoGe.git
 [submodule "frustum-pointnets"]
 	path = frustum-pointnets
-	url = git@github.com:charlesq34/frustum-pointnets.git
+	# url = git@github.com:charlesq34/frustum-pointnets.git
+	url = https://github.com/charlesq34/frustum-pointnets.git
 [submodule "total3d"]
 	path = total3d
 	url = https://github.com/yinyunie/Total3DUnderstanding.git
