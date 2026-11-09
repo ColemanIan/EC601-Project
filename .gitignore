@@ -21,6 +21,9 @@
 docs/GITHUB.md
 docs/SPRINT_1_PRESENTATION.odp
 paths
-data
 ignore
 *.egg-info
+*/*/__pycache__/
+*/__pycache__/
+/__pycache__/
+*/lock-scc.txt
