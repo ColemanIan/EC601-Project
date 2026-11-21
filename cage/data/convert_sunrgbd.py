@@ -1,95 +1,114 @@
-# cage/data/convert_sunrgbd.py
-import pickle, random
+"""SUN RGB-D converter (plan task D4.3). Run on the SCC:
+
+python -m cage.data.convert_sunrgbd
+
+Reads Total3D's per-image pickles from raw/sunrgbd/total3d_processed and writes processed/sunrgbd.
+Every frame conversion is a function of cage/geometry/frames.py; this file only moves data.
+"""
+import json
+import pickle
+from pathlib import Path
+
 import numpy as np
-from cage.config import RAW, PROCESSED
+
+from cage.config import PROCESSED, RAW
 from cage.data.sample_io import write_sample, write_splits
+from cage.geometry.frames import (NYU40_CLASSES, PITCH_BINS, ROLL_BINS, SUNRGBD_DEPTH_CAP_M, angle_from_bin,
+                                  box_from_total3d_corners, gravity_from_total3d)
 
-T = np.array([[0, 0, 1], [0, -1, 0], [1, 0, 0]], dtype=np.float64)    # T == T.T == inv(T)
-PITCH_BINS = np.deg2rad([[-60, -20], [-20, 20]])                       # total3d/configs/data_config.py
-ROLL_BINS = np.deg2rad([[-20, 0], [0, 20]])
-NYU40CLASSES = ['void',
-                'wall', 'floor', 'cabinet', 'bed', 'chair',
-                'sofa', 'table', 'door', 'window', 'bookshelf',
-                'picture', 'counter', 'blinds', 'desk', 'shelves',
-                'curtain', 'dresser', 'pillow', 'mirror', 'floor_mat',
-                'clothes', 'ceiling', 'books', 'refridgerator', 'television',
-                'paper', 'towel', 'shower_curtain', 'box', 'whiteboard',
-                'person', 'night_stand', 'toilet', 'sink', 'lamp',
-                'bathtub', 'bag', 'otherstructure', 'otherfurniture', 'otherprop']
+REPO = Path(__file__).resolve().parents[2]                       # the EC601 folder
+SPLIT_DIR = REPO / "total3d/data/sunrgbd/splits"                 # train.json, test.json: lists of pickle paths
+VAL_EVERY = 20                                                   # every 20th training image is held out for validation
 
-def from_bins(bins, cls, reg):                                          # total3d/net_utils/libs.py::num_from_bins
-    width = bins[0][1] - bins[0][0]
-    return bins[cls].mean() + reg * width
 
-def R_from_pitch_roll(pitch, roll):                                     # libs.py::R_from_yaw_pitch_roll with yaw = 0
-    cp, sp, cr, sr = np.cos(pitch), np.sin(pitch), np.cos(roll), np.sin(roll)
-    return np.array([[cp, -cr * sp, sp * sr],
-                     [sp, cp * cr, -cp * sr],
-                     [0.0, sr, cr]])
+def paste_mask(full_mask, crop, left, top):
+    """Write a bool crop into a full-size bool mask with its top-left pixel at (left, top), clipped at the border."""
+    crop_height = min(crop.shape[0], full_mask.shape[0] - top)
+    crop_width = min(crop.shape[1], full_mask.shape[1] - left)
+    full_mask[top:top + crop_height, left:left + crop_width] |= crop[:crop_height, :crop_width].astype(bool)
 
-def box_from_corners(c):
-    """8x3 corners in the upright frame, Total3D's order -> center, size_lwh, heading."""
-    front, side, up = (c[1] - c[0]) / 2, (c[2] - c[1]) / 2, (c[0] - c[4]) / 2
-    f = front / np.linalg.norm(front)
-    return {"center": c.mean(axis=0).tolist(),
-            "size_lwh": [2 * float(np.linalg.norm(front)), 2 * float(np.linalg.norm(side)), 2 * float(np.linalg.norm(up))],
-            "heading": float(np.arctan2(-f[2], f[0]))}
 
-def paste(full, crop, x1, y1):
-    """Paste a bool crop into a full-size bool mask at (x1, y1), clipping at the image border."""
-    h = min(crop.shape[0], full.shape[0] - y1)
-    w = min(crop.shape[1], full.shape[1] - x1)
-    full[y1:y1 + h, x1:x1 + w] |= crop[:h, :w].astype(bool)
+def convert_one(data, sample_id, split, out_root):
+    """One unpickled Total3D sample -> one processed/sunrgbd sample folder."""
+    image = np.asarray(data["rgb_img"])
+    depth = np.array(data["depth_map"], dtype=np.float32)
+    depth[depth >= SUNRGBD_DEPTH_CAP_M] = 0.0                           # Total3D clipped depth at 8 m; a clipped pixel is not a measurement
+    height, width = image.shape[:2]
+    camera = data["camera"]
+    K = np.asarray(camera["K"], dtype=np.float64)
+    pitch = angle_from_bin(PITCH_BINS, camera["pitch_cls"], camera["pitch_reg"])
+    roll = angle_from_bin(ROLL_BINS, camera["roll_cls"], camera["roll_reg"])
+    R_gravity = gravity_from_total3d(pitch, roll)                       # p_upright = R_gravity @ p_camera
+    principal_point = [K[0, 2], K[1, 2], K[0, 2], K[1, 2]]              # cx, cy, cx, cy
 
-def convert_one(data, sid, split, dst):
-    image, depth = np.asarray(data["rgb_img"]), np.asarray(data["depth_map"], dtype=np.float32)
-    H, W = image.shape[:2]
-    cam = data["camera"]
-    K = np.asarray(cam["K"], dtype=np.float64)
-    cam_R = R_from_pitch_roll(from_bins(PITCH_BINS, cam["pitch_cls"], cam["pitch_reg"]),
-                              from_bins(ROLL_BINS, cam["roll_cls"], cam["roll_reg"]))
-    R_gravity = T @ cam_R @ T                                           # OpenCV camera -> upright
-    boxes, objects, paint = data["boxes"], [], []
-    for j in range(len(boxes["bdb3D"])):
-        box3d = box_from_corners(np.asarray(boxes["bdb3D"][j]) @ T.T)   # world -> upright
-        amodal = (np.asarray(boxes["bdb2D_from_3D"][j]) * [K[0, 2], K[1, 2], K[0, 2], K[1, 2]]).tolist()
-        oid = j + 1
-        mask = boxes["mask"][j]
+    boxes = data["boxes"]                                               # a dict of per-object lists
+    objects, layers = [], []                                            # layers: (camera depth, object id, visible mask)
+    for index in range(len(boxes["bdb3D"])):
+        object_id = index + 1
+        box3d = box_from_total3d_corners(boxes["bdb3D"][index])         # Total3D world corners -> CAGE box in the upright frame
+        # Total3D stores this box divided by the principal point; multiplying restores pixels.
+        bbox2d_amodal = (np.asarray(boxes["bdb2D_from_3D"][index]) * principal_point).tolist()
+        mask = boxes["mask"][index]                                     # {'msk_bdb': [x1, y1, x2, y2], 'msk': bool crop} or None
         if mask is not None:
-            full = np.zeros((H, W), bool)
-            x1, y1 = int(mask["msk_bdb"][0]), int(mask["msk_bdb"][1])
-            paste(full, np.asarray(mask["msk"]), x1, y1)
-            z_cam = (R_gravity.T @ np.array(box3d["center"]))[2]       # center depth in the camera frame
-            paint.append((z_cam, oid, full))
-        objects.append({"id": oid, "class": NYU40CLASSES[boxes["size_cls"][j]],
-                        "bbox2d_visible": [float(v) for v in boxes["bdb2D_pos"][j]], "bbox2d_amodal": amodal,
-                        "box3d": box3d, "truncated": None, "occluded": None, "has_mask": False, "mask_amodal": None})
-    inst = np.zeros((H, W), np.uint16)
-    for z, oid, full in sorted(paint, key=lambda p: -p[0]):             # far first; the nearer object wins overlaps
-        inst[full] = oid
-    for o in objects:
-        o["has_mask"] = bool((inst == o["id"]).any())
-    layout = box_from_corners(np.asarray(data["layout"]["bdb3D"]) @ T.T)
-    meta = {"dataset": "sunrgbd", "sample_id": sid, "split": split, "width": W, "height": H,
+            full_mask = np.zeros((height, width), bool)
+            paste_mask(full_mask, np.asarray(mask["msk"]), int(mask["msk_bdb"][0]), int(mask["msk_bdb"][1]))
+            center_depth = float((R_gravity.T @ np.array(box3d["center"]))[2])   # z of the center in the camera frame
+            layers.append((center_depth, object_id, full_mask))
+        objects.append({"id": object_id, "class": NYU40_CLASSES[int(boxes["size_cls"][index])],
+                        "bbox2d_visible": [float(v) for v in boxes["bdb2D_pos"][index]],
+                        "bbox2d_amodal": bbox2d_amodal, "box3d": box3d,
+                        "truncated": None, "occluded": None, "has_mask": False, "mask_amodal": None})
+
+    instances = np.zeros((height, width), np.uint16)
+    for center_depth, object_id, full_mask in sorted(layers, key=lambda layer: -layer[0]):
+        instances[full_mask] = object_id                                # painted far first, so a nearer object overwrites
+    for obj in objects:
+        obj["has_mask"] = bool((instances == obj["id"]).any())
+
+    layout = box_from_total3d_corners(data["layout"]["bdb3D"])
+    meta = {"dataset": "sunrgbd", "sample_id": sample_id, "split": split, "width": width, "height": height,
             "K": K.tolist(), "R_gravity": R_gravity.tolist(), "depth_source": "sensor", "depth_bench_split": None,
             "label_type": "sensor", "has_depth": True, "has_masks": True, "has_amodal_masks": False,
             "has_boxes3d": True, "has_layout": True, "raw_ref": f"sunrgbd/{int(data['sequence_id'])}"}
-    write_sample(dst, sid, image, meta, objects, depth=depth, instances=inst, layout=layout)
+    write_sample(out_root, sample_id, image, meta, objects, depth=depth, instances=instances, layout=layout)
 
-def main():
-    src, dst = RAW / "sunrgbd/total3d_processed", PROCESSED / "sunrgbd"
-    files = sorted(p for p in src.rglob("*.pkl") if not p.stem.endswith("_flip"))
-    random.seed(0)
-    splits = {"train": [], "val": [], "test": []}
-    for p in files:
-        data = pickle.load(open(p, "rb"))
-        seq = int(data["sequence_id"])
-        split = "test" if seq <= 5050 else ("val" if random.random() < 0.05 else "train")
-        sid = f"{seq:05d}"
-        convert_one(data, sid, split, dst)
-        splits[split].append(sid)
-    write_splits(dst, splits)
-    print({k: len(v) for k, v in splits.items()})
+
+def split_sequence_ids(split_dir, name):
+    """Total3D's split file -> the sorted SUN RGB-D sequence ids in it, flipped copies left out."""
+    stems = [Path(path).stem for path in json.load(open(split_dir / f"{name}.json"))]
+    return sorted(int(stem) for stem in stems if not stem.endswith("_flip"))
+
+
+def make_splits(split_dir):
+    """Total3D's test split is kept; every VAL_EVERY-th id of its train split becomes validation."""
+    train_ids = split_sequence_ids(split_dir, "train")
+    val_ids = train_ids[::VAL_EVERY]
+    held_out = set(val_ids)
+    return {"train": [i for i in train_ids if i not in held_out], "val": val_ids,
+            "test": split_sequence_ids(split_dir, "test")}
+
+
+def main(raw=RAW, processed=PROCESSED, split_dir=SPLIT_DIR):
+    pickle_root = raw / "sunrgbd/total3d_processed"
+    out_root = processed / "sunrgbd"
+    pickle_path = {int(path.stem): path for path in pickle_root.rglob("*.pkl") if path.stem.isdigit()}   # flips excluded
+    written = {"train": [], "val": [], "test": []}
+    missing = []
+    for split, sequence_ids in make_splits(split_dir).items():
+        for sequence_id in sequence_ids:
+            if sequence_id not in pickle_path:
+                missing.append(sequence_id)
+                continue
+            with open(pickle_path[sequence_id], "rb") as f:
+                data = pickle.load(f)
+            assert int(data["sequence_id"]) == sequence_id, f"{pickle_path[sequence_id]} holds sequence {data['sequence_id']}"
+            sample_id = f"{sequence_id:05d}"
+            convert_one(data, sample_id, split, out_root)
+            written[split].append(sample_id)
+    write_splits(out_root, written)
+    print({split: len(ids) for split, ids in written.items()},
+          f"; {len(missing)} ids in the split files have no pickle", missing[:5])
+
 
 if __name__ == "__main__":
     main()

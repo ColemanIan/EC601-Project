@@ -1,0 +1,210 @@
+{
+  "about": "CAGE frame registry: the fixed conventions of the project. Axis definitions, axis-change matrices, angle bins, corner orders, encodings and class lists live here and nowhere else; cage/geometry/frames.py loads this file and every other module imports from there. Per-sample matrices (K, R_gravity, t_cam2) are data and live in each sample's meta.json. tests/test_frames.py checks every entry. Units: meters and radians unless a key ends in _deg.",
+  "version": 1,
+  "directions": {
+    "about": "Shared vocabulary for axis meanings, written as unit vectors in the OpenCV camera frame. 'front' is the object-relative name for 'forward': an object frame is described as if the object faced the camera's forward direction.",
+    "right": [1, 0, 0],
+    "left": [-1, 0, 0],
+    "down": [0, 1, 0],
+    "up": [0, -1, 0],
+    "forward": [0, 0, 1],
+    "back": [0, 0, -1],
+    "front": [0, 0, 1]
+  },
+  "frames": {
+    "opencv_camera": {
+      "axes": ["right", "down", "forward"],
+      "used_by": "CAGE camera frame C, MoGe, KITTI rectified cameras, KITTI depth maps"
+    },
+    "upright": {
+      "axes": ["right", "down", "forward"],
+      "used_by": "CAGE upright frame U: same axis names as C after rotation by R_gravity, so y is along gravity"
+    },
+    "total3d_camera": {
+      "axes": ["forward", "up", "right"],
+      "used_by": "Total3D 'toward-up-right' camera axes; the Total3D world frame W uses the same order"
+    },
+    "kitti_velodyne": {
+      "axes": ["forward", "left", "up"],
+      "used_by": "KITTI LiDAR scans, velodyne/*.bin"
+    },
+    "open3d_display": {
+      "axes": ["right", "up", "back"],
+      "used_by": "Open3D viewer convention (OpenGL): y up, camera looks along -z"
+    },
+    "pytorch3d_camera": {
+      "axes": ["left", "up", "forward"],
+      "used_by": "PyTorch3D camera view coordinates"
+    },
+    "box_local": {
+      "axes": ["front", "down", "left"],
+      "used_by": "CAGE box frame: x = length (front), y = height (down), z = width; this is what R_y(heading) rotates"
+    },
+    "pix3d_model": {
+      "axes": ["left", "up", "front"],
+      "used_by": "Pix3D model frame as Total3D places it: model z runs along the box's length axis. Whether that is the object's physical front is confirmed by eye in task D5.3"
+    }
+  },
+  "axis_changes": {
+    "about": "Each matrix A maps coordinates in 'from' to coordinates in 'to': p_to = A @ p_from. The test derives A from the two frames' axis names and compares.",
+    "T": {
+      "from": "total3d_camera",
+      "to": "opencv_camera",
+      "matrix": [[0, 0, 1], [0, -1, 0], [1, 0, 0]],
+      "involution": true,
+      "note": "Also maps opencv_camera to total3d_camera, and Total3D world W to upright U"
+    },
+    "F_open3d": {
+      "from": "opencv_camera",
+      "to": "open3d_display",
+      "matrix": [[1, 0, 0], [0, -1, 0], [0, 0, -1]],
+      "involution": true,
+      "note": "Display only; never applied to saved data"
+    },
+    "P_pytorch3d": {
+      "from": "opencv_camera",
+      "to": "pytorch3d_camera",
+      "matrix": [[-1, 0, 0], [0, -1, 0], [0, 0, 1]],
+      "involution": true,
+      "note": "cameras_from_opencv_projection applies this internally"
+    },
+    "VELO_TO_CAM_IDEAL": {
+      "from": "kitti_velodyne",
+      "to": "opencv_camera",
+      "matrix": [[0, -1, 0], [0, 0, -1], [1, 0, 0]],
+      "involution": false,
+      "note": "Ideal axis permutation. The real rotation is Tr_velo_to_cam[:, :3], within about 1 degree of this"
+    },
+    "MODEL_TO_BOX": {
+      "from": "pix3d_model",
+      "to": "box_local",
+      "matrix": [[0, 0, 1], [0, -1, 0], [1, 0, 0]],
+      "involution": true,
+      "note": "Equal to T. Placement: p_U = c + R_y(heading) @ diag(l/2, h/2, w/2) @ MODEL_TO_BOX @ n"
+    }
+  },
+  "reflections": {
+    "M_mirror": {
+      "matrix": [[-1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "note": "Horizontal flip. Points p -> M p; rotations R -> M R M; heading h -> pi - h; principal point cx -> W - 1 - cx; 2D box x1' = W - 1 - x2, x2' = W - 1 - x1"
+    }
+  },
+  "rotation_conventions": {
+    "R_y": "[[cos a, 0, sin a], [0, 1, 0], [-sin a, 0, cos a]]; box length axis = R_y(h) @ [1, 0, 0] = (cos h, 0, -sin h)",
+    "frustum_rotation": "p_frustum = R_y(-phi) @ p, phi = atan2(r_x, r_z) for the ray r through the 2D box center",
+    "total3d_cam_R": "R_from_yaw_pitch_roll(0, pitch, roll) = R_z(pitch) @ R_x(roll); negative pitch looks down",
+    "R_gravity_from_total3d": "R_gravity = T @ cam_R @ T = R_x(pitch) @ R_z(roll)"
+  },
+  "total3d_bins_deg": {
+    "about": "total3d/configs/data_config.py. angle = mean(bins[cls]) + reg * (bins[0][1] - bins[0][0])",
+    "pitch": [[-60.0, -20.0], [-20.0, 20.0]],
+    "roll": [[-20.0, 0.0], [0.0, 20.0]]
+  },
+  "box_corners": {
+    "about": "Sign of each corner along (x, y, z) of the box's own frame.",
+    "cage_order": {
+      "signs": [
+        [1, 1, 1],
+        [1, 1, -1],
+        [-1, 1, -1],
+        [-1, 1, 1],
+        [1, -1, 1],
+        [1, -1, -1],
+        [-1, -1, -1],
+        [-1, -1, 1]
+      ],
+      "axes_scale": "(l/2, h/2, w/2)",
+      "bottom_face": [0, 1, 2, 3],
+      "front_face": [0, 1, 4, 5],
+      "note": "Frustum PointNets order; y points down, so corners 0-3 are the bottom face. The KITTI devkit uses the same order."
+    },
+    "total3d_order": {
+      "signs": [
+        [-1, 1, -1],
+        [-1, 1, 1],
+        [1, 1, 1],
+        [1, 1, -1],
+        [-1, -1, -1],
+        [-1, -1, 1],
+        [1, -1, 1],
+        [1, -1, -1]
+      ],
+      "axes_scale": "(coeffs[0], coeffs[1], coeffs[2]) along basis rows b0 (side), b1 (up), b2 (front)",
+      "top_face": [0, 1, 2, 3],
+      "note": "Total3D get_corners_of_bb3d_no_index. coeffs are half-sizes."
+    },
+    "total3d_to_cage_index": [6, 5, 4, 7, 2, 1, 0, 3]
+  },
+  "encodings": {
+    "depth_png_scale": 256.0,
+    "depth_png_dtype": "uint16",
+    "depth_invalid_value": 0,
+    "sunrgbd_depth_cap_m": 8.0,
+    "pixel_center_offset_moge": 0.5,
+    "grid_sample_align_corners": true
+  },
+  "classes": {
+    "about": "kitti and sunrgbd are the classes CAGE trains and evaluates on. nyu40 is indexed by Total3D's size_cls. pix3d is indexed by Total3D's class_id. kins_to_kitti maps KINS category names to KITTI label types; 'rider' is absent on purpose (KITTI has no such class).",
+    "kitti": ["Car", "Pedestrian", "Cyclist"],
+    "sunrgbd": ["bed", "table", "sofa", "chair", "toilet", "desk", "dresser", "night_stand", "bookshelf", "bathtub"],
+    "pix3d": ["misc", "bed", "bookcase", "chair", "desk", "sofa", "table", "tool", "wardrobe"],
+    "nyu40": ["void", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door", "window", "bookshelf", "picture", "counter", "blinds", "desk", "shelves", "curtain", "dresser", "pillow", "mirror", "floor_mat", "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel", "shower_curtain", "box", "whiteboard", "person", "night_stand", "toilet", "sink", "lamp", "bathtub", "bag", "otherstructure", "otherfurniture", "otherprop"],
+    "kins_categories": {
+      "1": "cyclist",
+      "2": "pedestrian",
+      "3": "rider",
+      "4": "car",
+      "5": "tram",
+      "6": "truck",
+      "7": "van",
+      "8": "misc"
+    },
+    "kins_to_kitti": {
+      "car": "Car",
+      "van": "Van",
+      "truck": "Truck",
+      "tram": "Tram",
+      "misc": "Misc",
+      "pedestrian": "Pedestrian",
+      "cyclist": "Cyclist"
+    }
+  },
+  "worked_examples": {
+    "kitti_2011_09_26": {
+      "about": "Published calibration of KITTI raw drive 2011_09_26; numbers checked numerically in the Atlas and the Handbook.",
+      "Tr_velo_to_cam": [
+        [0.007533745, -0.9999714, -0.000616602, -0.004069766],
+        [0.01480249, 0.0007280733, -0.9998902, -0.07631618],
+        [0.9998621, 0.00752379, 0.01480755, -0.2717806]
+      ],
+      "R0_rect": [[0.9999239, 0.00983776, -0.007445048], [-0.009869795, 0.9999421, -0.004278459], [0.007402527, 0.004351614, 0.9999631]],
+      "P2": [[721.5377, 0.0, 609.5593, 44.85728], [0.0, 721.5377, 172.854, 0.2163791], [0.0, 0.0, 1.0, 0.002745884]],
+      "expected_t_cam2": [0.059849, -0.000358, 0.002746],
+      "lidar_point": [10.0, 1.0, -0.5],
+      "expected_p_cam2": [-0.935262, 0.539538, 9.724966],
+      "expected_pixel": [540.168, 212.885],
+      "label": {
+        "dimensions_hwl": [1.56, 1.67, 3.69],
+        "location": [1.78, 2.25, 8.41],
+        "rotation_y": -1.56
+      },
+      "expected_center_cam2": [1.839849, 1.469642, 8.412746],
+      "expected_center_pixel": [767.358, 298.901]
+    },
+    "sunrgbd_floor_point": {
+      "about": "SUN RGB-D-style intrinsics; a floor pixel 1.48 m below a camera pitched 25 degrees down (Total3D pitch -25).",
+      "K": [[529.5, 0.0, 365.0], [0.0, 529.5, 265.0], [0.0, 0.0, 1.0]],
+      "pixel": [365, 450],
+      "depth_z": 2.0,
+      "pitch_deg": -25.0,
+      "roll_deg": 0.0,
+      "expected_p_upright": [0.0, 1.478539, 1.517302]
+    },
+    "kitti_flip_offset": {
+      "about": "Mirroring a KITTI image without mirroring cx shifts every projected label by W - 1 - 2 cx pixels.",
+      "W": 1242,
+      "cx": 609.5593,
+      "expected_offset_px": 21.8814
+    }
+  }
+}

@@ -1,3 +1,6 @@
+"""Reader and writer of the scene sample format (plan task D2.1). Every converter writes through write_sample,
+and every reader goes through read_sample, so the format is defined in this one file.
+"""
 import json
 from pathlib import Path
 import numpy as np
